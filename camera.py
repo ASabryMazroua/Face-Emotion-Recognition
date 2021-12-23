@@ -1,15 +1,36 @@
 import cv2
 from model import FacialExpressionModel
 import numpy as np
+import pandas as pd
+import datetime
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+import seaborn as sns
+import io
 
 facec = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 model = FacialExpressionModel("model.json", "model_weights.h5")
 font = cv2.FONT_HERSHEY_SIMPLEX
 
+EMOTIONS_LIST = ["Angry", "Disgust","Fear", "Happy","Neutral", "Sad","Surprise"]
+
+def plot_preds(preds):
+    fig = Figure()
+    axis = fig.add_subplot(1, 1, 1)
+    sns.barplot(x = EMOTIONS_LIST,
+                y = preds.reshape(7,),
+                 ax=axis)
+    output = io.BytesIO()
+    FigureCanvas(fig).print_png(output)
+    with open("charts/chart", "wb") as file:
+        file.write(output.getvalue())
+
 class VideoCamera(object):
-    def __init__(self):
-        #self.video = cv2.VideoCapture('/home/rhyme/Desktop/Project/videos/facial_exp.mkv')
-        self.video = cv2.VideoCapture(0)
+    def __init__(self,logging,link=0):
+        #link = r'/home/rhyme/Desktop/Project/videos/facial_exp.mkv'
+        self.video = cv2.VideoCapture(link)
+        self.logging = logging
+        self.log = pd.read_pickle(f'logs/{logging}.pkl')
 
     def __del__(self):
         self.video.release()
@@ -19,15 +40,21 @@ class VideoCamera(object):
         _, fr = self.video.read()
         gray_fr = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
         faces = facec.detectMultiScale(gray_fr, 1.3, 5)
-
         for (x, y, w, h) in faces:
             fc = gray_fr[y:y+h, x:x+w]
 
             roi = cv2.resize(fc, (48, 48))
-            pred = model.predict_emotion(roi[np.newaxis, :, :, np.newaxis])
-
+            preds = model.predict_emotion(roi[np.newaxis, :, :, np.newaxis])
+            
+            pred = EMOTIONS_LIST[np.argmax(preds)]
+            
+            preds = preds.reshape(1,7)
+            plot_preds(preds)
+            self.log = self.log.append(pd.DataFrame(list(preds), columns=EMOTIONS_LIST, index=[datetime.datetime.now()]), ignore_index=True)
+            
             cv2.putText(fr, pred, (x, y), font, 1, (255, 255, 0), 2)
             cv2.rectangle(fr,(x,y),(x+w,y+h),(255,0,0),2)
 
         _, jpeg = cv2.imencode('.jpg', fr)
+        pd.to_pickle(self.log, f'logs/{self.logging}.pkl')
         return jpeg.tobytes()

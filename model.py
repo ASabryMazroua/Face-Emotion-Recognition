@@ -1,6 +1,5 @@
 from tensorflow.keras.models import model_from_json
 from tensorflow.python.keras.backend import set_session
-import numpy as np
 
 import tensorflow as tf
 
@@ -12,10 +11,7 @@ set_session(session)
 
 class FacialExpressionModel(object):
 
-    EMOTIONS_LIST = ["Angry", "Disgust",
-                     "Fear", "Happy",
-                     "Neutral", "Sad",
-                     "Surprise"]
+    # EMOTIONS_LIST = ["Angry", "Disgust","Fear", "Happy","Neutral", "Sad","Surprise"]
 
     def __init__(self, model_json_file, model_weights_file):
         # load model from JSON file
@@ -32,4 +28,4 @@ class FacialExpressionModel(object):
         global session
         set_session(session)
         self.preds = self.loaded_model.predict(img)
-        return FacialExpressionModel.EMOTIONS_LIST[np.argmax(self.preds)]
+        return self.preds
